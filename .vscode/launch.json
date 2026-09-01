@@ -1,0 +1,104 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "AttendanceAgent: Menu interaktif",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/AttendanceAgent/bin/Debug/net8.0/attendance-agent.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "stopAtEntry": false
+        },
+        {
+            "name": "AttendanceAgent: status",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/AttendanceAgent/bin/Debug/net8.0/attendance-agent.dll",
+            "args": ["status"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "stopAtEntry": false
+        },
+        {
+            "name": "AttendanceAgent: fetch",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/AttendanceAgent/bin/Debug/net8.0/attendance-agent.dll",
+            "args": ["fetch"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "stopAtEntry": false
+        },
+        {
+            "name": "AttendanceAgent: scan",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/AttendanceAgent/bin/Debug/net8.0/attendance-agent.dll",
+            "args": ["scan"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "stopAtEntry": false
+        },
+        {
+            "name": "AttendanceAgent: export (contoh)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/AttendanceAgent/bin/Debug/net8.0/attendance-agent.dll",
+            "args": ["export", "--out", "debug-export.csv"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "stopAtEntry": false
+        },
+        {
+            "name": "AttendanceAgent: sync-users (contoh)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/AttendanceAgent/bin/Debug/net8.0/attendance-agent.dll",
+            "args": ["sync-users", "--machine", "Mesin Lantai 1"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "stopAtEntry": false
+        },
+        {
+            "name": "AttendanceAgent: update-time",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/AttendanceAgent/bin/Debug/net8.0/attendance-agent.dll",
+            "args": ["update-time"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "stopAtEntry": false
+        },
+        {
+            "name": "AttendanceAgent: delete --force (contoh, HATI-HATI)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/AttendanceAgent/bin/Debug/net8.0/attendance-agent.dll",
+            "args": ["delete", "--machine", "Mesin Lantai 1", "--force"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "stopAtEntry": false
+        },
+        {
+            "name": "AttendanceAgent.Tests: Debug tests",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "dotnet",
+            "args": ["test", "${workspaceFolder}/tests/AttendanceAgent.Tests/AttendanceAgent.Tests.csproj"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "stopAtEntry": false
+        }
+    ]
+}

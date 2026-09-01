@@ -1,0 +1,10 @@
+bin/
+obj/
+publish/
+TestResults/
+config.json
+*.db
+*.db-shm
+*.db-wal
+attendance-agent.log*
+.DS_Store

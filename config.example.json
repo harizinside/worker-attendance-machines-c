@@ -1,0 +1,8 @@
+{
+  "cms_base_url": "https://cms.example.com",
+  "db_path": "attendance.db",
+  "capacity_warning_pct": 90,
+  "machines": [
+    { "name": "Mesin Lantai 1", "ip": "192.168.1.100", "port": 4370, "serial_number": "SN001" }
+  ]
+}

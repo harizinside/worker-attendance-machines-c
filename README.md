@@ -1,0 +1,42 @@
+# Worker Attendance Machines (.NET 8)
+
+Console tool untuk menarik log punch ZKTeco, dedup/queue di SQLite, push ke `deneire-cms` dengan protokol ADMS, provisioning karyawan, scan LAN, hapus log, dan sinkronisasi waktu. Ini adalah port C# dari tool Python dengan CLI yang sama.
+
+## Prasyarat Windows
+
+- Windows x64 dan akses LAN ke mesin (biasanya TCP port `4370`).
+- Official ZKTeco **Standalone SDK** harus di-install pada setiap PC yang menjalankan tool. COM component `zkemkeeper.dll` harus terdaftar (installer vendor biasanya melakukan ini; jika perlu jalankan `regsvr32 zkemkeeper.dll` sebagai administrator).
+- Serial number di `config.json` harus sama persis dengan mesin yang didaftarkan di CMS.
+
+SDK proprietary tidak disertakan dalam release. Aplikasi memakai late binding `zkemkeeper.CZKEM`, sehingga build/CI tidak membutuhkan DLL SDK; operasi device akan memberi pesan jelas bila dijalankan non-Windows atau COM belum terdaftar.
+
+## Konfigurasi dan penggunaan
+
+Salin `config.example.json` menjadi `config.json`, edit URL CMS, database, dan daftar mesin. Path config/database tetap relatif terhadap working directory.
+
+```powershell
+attendance-agent.exe fetch [--machine "Mesin Lantai 1"]
+attendance-agent.exe export [--machine NAME] [--from 2025-01-01] [--to 2025-01-31] --out laporan.csv
+attendance-agent.exe delete --machine NAME [--force]
+attendance-agent.exe status [--machine NAME]
+attendance-agent.exe sync-users --machine NAME
+attendance-agent.exe scan [--subnet 192.168.1] [--port 4370]
+attendance-agent.exe update-time [--machine NAME]
+```
+
+Tanpa argumen, aplikasi menampilkan menu interaktif. `delete` ditolak bila masih ada queue yang belum terkirim kecuali `--force`. Log berada di `attendance-agent.log` di samping executable, atau `%LOCALAPPDATA%\AttendanceAgent` bila folder aplikasi tidak writable.
+
+## Build, test, publish
+
+```powershell
+dotnet build
+dotnet test
+dotnet publish src/AttendanceAgent/AttendanceAgent.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=false -o publish/attendance-agent
+Copy-Item config.example.json publish/attendance-agent/config.example.json
+```
+
+Publish sengaja folder-based agar native SQLite tidak diekstrak ke `%TEMP%`, yang dapat diblokir Windows Application Control. Untuk Task Scheduler, isi **Start in** dengan folder yang berisi `config.json`, lalu gunakan argument `fetch`.
+
+## Verifikasi hardware wajib
+
+Signature/metode mengikuti surface `ICZKEM` Standalone SDK yang umum. Constants `GetDeviceStatus` dan signature user/device-info harus dicocokkan dengan dokumentasi/type library versi SDK yang benar-benar dipasang. Lakukan smoke test di Windows pada LAN mesin nyata: `status`, `scan`, lalu `fetch`; verifikasi kapasitas, serial, punch type, timestamp WIB, push CMS, dan guard `delete` sebelum produksi.

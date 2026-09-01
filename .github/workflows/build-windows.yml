@@ -1,0 +1,25 @@
+name: Build Windows
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet test --configuration Release
+      - run: dotnet publish src/AttendanceAgent/AttendanceAgent.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=false -o publish/attendance-agent
+      - run: Copy-Item config.example.json publish/attendance-agent/config.example.json
+      - run: Compress-Archive -Path publish/attendance-agent/* -DestinationPath publish/attendance-agent-windows.zip
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Windows Build
+          prerelease: true
+          files: publish/attendance-agent-windows.zip

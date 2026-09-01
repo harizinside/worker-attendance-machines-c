@@ -31,11 +31,11 @@ Tanpa argumen, aplikasi menampilkan menu interaktif. `delete` ditolak bila masih
 ```powershell
 dotnet build
 dotnet test
-dotnet publish src/AttendanceAgent/AttendanceAgent.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=false -o publish/attendance-agent
+dotnet publish src/AttendanceAgent/AttendanceAgent.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish/attendance-agent
 Copy-Item config.example.json publish/attendance-agent/config.example.json
 ```
 
-Publish sengaja folder-based agar native SQLite tidak diekstrak ke `%TEMP%`, yang dapat diblokir Windows Application Control. Untuk Task Scheduler, isi **Start in** dengan folder yang berisi `config.json`, lalu gunakan argument `fetch`.
+Publish pakai `PublishSingleFile=true` — hasilnya cuma 3 file (`attendance-agent.exe`, `.pdb`, dan `e_sqlite3.dll`) alih-alih ~200 DLL berserakan. `IncludeNativeLibrariesForSelfExtract` sengaja dibiarkan default (`false`), jadi satu-satunya native dependency (`e_sqlite3.dll` — SQLite) tetap jadi file biasa di sebelah exe, **bukan** di-embed lalu diekstrak ke `%TEMP%` saat runtime — jadi tetap aman dari blokir Windows Application Control tanpa perlu folder-based `--onedir`-style publish. Untuk Task Scheduler, isi **Start in** dengan folder yang berisi `config.json`, lalu gunakan argument `fetch`.
 
 ## Verifikasi hardware wajib
 

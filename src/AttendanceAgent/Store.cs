@@ -22,6 +22,8 @@ public sealed class Store : IDisposable
             CREATE TABLE IF NOT EXISTS machine_state (
               machine_serial TEXT PRIMARY KEY, last_fetch_ok_at TEXT,
               consecutive_fail_count INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS machines (name TEXT PRIMARY KEY, ip TEXT NOT NULL, port INTEGER NOT NULL, serial_number TEXT NOT NULL);
             """; cmd.ExecuteNonQuery();
     }
     public int UpsertLogs(string serial, IEnumerable<AttendanceRecord> logs)
@@ -43,6 +45,15 @@ public sealed class Store : IDisposable
         using var cmd=Command(ok ? "INSERT INTO machine_state(machine_serial,last_fetch_ok_at,consecutive_fail_count) VALUES($s,$n,0) ON CONFLICT(machine_serial) DO UPDATE SET last_fetch_ok_at=excluded.last_fetch_ok_at,consecutive_fail_count=0" : "INSERT INTO machine_state(machine_serial,consecutive_fail_count) VALUES($s,1) ON CONFLICT(machine_serial) DO UPDATE SET consecutive_fail_count=consecutive_fail_count+1");Add(cmd,"$s",serial);if(ok)Add(cmd,"$n",DateTimeOffset.UtcNow.ToString("O"));cmd.ExecuteNonQuery();
     }
     public MachineState? GetMachineState(string serial){using var cmd=Command("SELECT machine_serial,last_fetch_ok_at,consecutive_fail_count FROM machine_state WHERE machine_serial=$s");Add(cmd,"$s",serial);using var r=cmd.ExecuteReader();return r.Read()?new(r.GetString(0),r.IsDBNull(1)?null:r.GetString(1),r.GetInt32(2)):null;}
+    public string? GetSetting(string key){using var cmd=Command("SELECT value FROM settings WHERE key=$k");Add(cmd,"$k",key);return cmd.ExecuteScalar() as string;}
+    public void SetSetting(string key,string value){using var cmd=Command("INSERT INTO settings(key,value) VALUES($k,$v) ON CONFLICT(key) DO UPDATE SET value=excluded.value");Add(cmd,"$k",key);Add(cmd,"$v",value);cmd.ExecuteNonQuery();}
+    public AppSettings GetAppSettings(){var url=GetSetting("cms_base_url")??"";var raw=GetSetting("capacity_warning_pct");return new(url,int.TryParse(raw,out var pct)?pct:90);}
+    public void SetCmsBaseUrl(string url)=>SetSetting("cms_base_url",url);
+    public void SetCapacityWarningPct(int pct)=>SetSetting("capacity_warning_pct",pct.ToString());
+    public IReadOnlyList<MachineConfig> GetMachines(){using var cmd=Command("SELECT name,ip,port,serial_number FROM machines ORDER BY name");using var r=cmd.ExecuteReader();var rows=new List<MachineConfig>();while(r.Read())rows.Add(new(r.GetString(0),r.GetString(1),r.GetInt32(2),r.GetString(3)));return rows;}
+    public MachineConfig? FindMachine(string name){using var cmd=Command("SELECT name,ip,port,serial_number FROM machines WHERE name=$n");Add(cmd,"$n",name);using var r=cmd.ExecuteReader();return r.Read()?new(r.GetString(0),r.GetString(1),r.GetInt32(2),r.GetString(3)):null;}
+    public void UpsertMachine(MachineConfig machine){using var cmd=Command("INSERT INTO machines(name,ip,port,serial_number) VALUES($n,$i,$p,$s) ON CONFLICT(name) DO UPDATE SET ip=excluded.ip,port=excluded.port,serial_number=excluded.serial_number");Add(cmd,"$n",machine.Name);Add(cmd,"$i",machine.Ip);Add(cmd,"$p",machine.Port);Add(cmd,"$s",machine.SerialNumber);cmd.ExecuteNonQuery();}
+    public bool RemoveMachine(string name){using var cmd=Command("DELETE FROM machines WHERE name=$n");Add(cmd,"$n",name);return cmd.ExecuteNonQuery()>0;}
     private IReadOnlyList<StoredLog> QueryLogs(string sql,string serial){using var cmd=Command(sql);Add(cmd,"$s",serial);return ReadLogs(cmd);}
     private static IReadOnlyList<StoredLog> ReadLogs(SqliteCommand cmd){var rows=new List<StoredLog>();using var r=cmd.ExecuteReader();while(r.Read())rows.Add(new(r.GetString(0),r.GetString(1),r.GetInt32(2)));return rows;}
     private SqliteCommand Command(string text){var cmd=Connection.CreateCommand();cmd.CommandText=text;return cmd;}

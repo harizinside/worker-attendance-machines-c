@@ -3,6 +3,7 @@ obj/
 publish/
 TestResults/
 config.json
+config.json.imported
 *.db
 *.db-shm
 *.db-wal

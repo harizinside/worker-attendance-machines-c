@@ -4,15 +4,17 @@ Console tool untuk menarik log punch ZKTeco, dedup/queue di SQLite, push ke `den
 
 ## Prasyarat Windows
 
-- Windows x64 dan akses LAN ke mesin (biasanya TCP port `4370`).
-- Official ZKTeco **Standalone SDK** harus di-install pada setiap PC yang menjalankan tool. COM component `zkemkeeper.dll` harus terdaftar (installer vendor biasanya melakukan ini; jika perlu jalankan `regsvr32 zkemkeeper.dll` sebagai administrator).
-- Serial number di `config.json` harus sama persis dengan mesin yang didaftarkan di CMS.
+- App berjalan sebagai proses **32-bit (x86)** karena `zkemkeeper.dll` dari ZKTeco Standalone SDK adalah COM component 32-bit-only — Windows tidak bisa memuat in-proc COM server 32-bit ke proses 64-bit. Windows 32-bit maupun 64-bit keduanya bisa dipakai, asalkan ada akses LAN ke mesin (biasanya TCP port `4370`).
+- Official ZKTeco **Standalone SDK** harus di-install pada setiap PC yang menjalankan tool. COM component `zkemkeeper.dll` harus terdaftar (installer vendor biasanya melakukan ini; jika perlu jalankan regsvr32 versi 32-bit sebagai administrator: `%windir%\SysWOW64\regsvr32.exe zkemkeeper.dll` di Windows 64-bit).
+- Serial number yang diisi lewat menu Settings harus sama persis dengan mesin yang didaftarkan di CMS.
 
 SDK proprietary tidak disertakan dalam release. Aplikasi memakai late binding `zkemkeeper.CZKEM`, sehingga build/CI tidak membutuhkan DLL SDK; operasi device akan memberi pesan jelas bila dijalankan non-Windows atau COM belum terdaftar.
 
 ## Konfigurasi dan penggunaan
 
-Salin `config.example.json` menjadi `config.json`, edit URL CMS, database, dan daftar mesin. Path config/database tetap relatif terhadap working directory.
+Jalankan aplikasi tanpa argumen. Pada first run, aplikasi meminta URL CMS, meminta konfirmasi, lalu menawarkan scan LAN untuk memilih mesin yang akan didaftarkan. Pengaturan dan daftar mesin disimpan di `attendance.db`, di folder yang sama dengan log (di samping executable bila writable, atau `%LOCALAPPDATA%\AttendanceAgent`). Semuanya dapat diubah kemudian lewat menu **8. Settings**.
+
+Jika `config.json` lama ditemukan di working directory, URL CMS, capacity warning, dan entri mesin yang valid diimpor otomatis. Setelah berhasil, file tersebut di-rename menjadi `config.json.imported` dan wizard dilewati.
 
 ```powershell
 attendance-agent.exe fetch [--machine "Mesin Lantai 1"]
@@ -31,11 +33,10 @@ Tanpa argumen, aplikasi menampilkan menu interaktif. `delete` ditolak bila masih
 ```powershell
 dotnet build
 dotnet test
-dotnet publish src/AttendanceAgent/AttendanceAgent.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish/attendance-agent
-Copy-Item config.example.json publish/attendance-agent/config.example.json
+dotnet publish src/AttendanceAgent/AttendanceAgent.csproj -c Release -r win-x86 --self-contained -p:PublishSingleFile=true -o publish/attendance-agent
 ```
 
-Publish pakai `PublishSingleFile=true` — hasilnya cuma 3 file (`attendance-agent.exe`, `.pdb`, dan `e_sqlite3.dll`) alih-alih ~200 DLL berserakan. `IncludeNativeLibrariesForSelfExtract` sengaja dibiarkan default (`false`), jadi satu-satunya native dependency (`e_sqlite3.dll` — SQLite) tetap jadi file biasa di sebelah exe, **bukan** di-embed lalu diekstrak ke `%TEMP%` saat runtime — jadi tetap aman dari blokir Windows Application Control tanpa perlu folder-based `--onedir`-style publish. Untuk Task Scheduler, isi **Start in** dengan folder yang berisi `config.json`, lalu gunakan argument `fetch`.
+Publish pakai `PublishSingleFile=true` — hasilnya cuma 3 file (`attendance-agent.exe`, `.pdb`, dan `e_sqlite3.dll`) alih-alih ~200 DLL berserakan. `IncludeNativeLibrariesForSelfExtract` sengaja dibiarkan default (`false`), jadi satu-satunya native dependency (`e_sqlite3.dll` — SQLite) tetap jadi file biasa di sebelah exe, **bukan** di-embed lalu diekstrak ke `%TEMP%` saat runtime — jadi tetap aman dari blokir Windows Application Control tanpa perlu folder-based `--onedir`-style publish. Untuk Task Scheduler, gunakan argument `fetch`; lokasi database dan log tidak bergantung pada working directory.
 
 ## Verifikasi hardware wajib
 

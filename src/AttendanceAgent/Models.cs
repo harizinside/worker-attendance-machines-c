@@ -1,6 +1,7 @@
 namespace AttendanceAgent;
 
 public sealed record MachineConfig(string Name, string Ip, int Port, string SerialNumber);
+public sealed record AppSettings(string CmsBaseUrl, int CapacityWarningPct);
 public sealed record AttendanceRecord(string FingerId, DateTimeOffset PunchTime, int Status);
 public sealed record DeviceInfo(int RecCapacity, int AttendanceCount, int UsersCount);
 public sealed record Employee(string FingerId, string Name);
@@ -29,3 +30,5 @@ public interface ICmsClient
     Task<(bool Success, string Message)> PushAttlogAsync(string baseUrl, string serial, IReadOnlyList<StoredLog> logs, CancellationToken cancellationToken = default);
     Task<(bool Success, IReadOnlyList<Employee> Employees, string Message)> GetProvisionableEmployeesAsync(string baseUrl, string serial, CancellationToken cancellationToken = default);
 }
+
+public sealed class ConfigException(string message) : Exception(message);

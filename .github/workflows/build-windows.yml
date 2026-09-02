@@ -14,8 +14,7 @@ jobs:
         with:
           dotnet-version: 8.0.x
       - run: dotnet test --configuration Release
-      - run: dotnet publish src/AttendanceAgent/AttendanceAgent.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish/attendance-agent
-      - run: Copy-Item config.example.json publish/attendance-agent/config.example.json
+      - run: dotnet publish src/AttendanceAgent/AttendanceAgent.csproj -c Release -r win-x86 --self-contained -p:PublishSingleFile=true -o publish/attendance-agent
       - run: Compress-Archive -Path publish/attendance-agent/* -DestinationPath publish/attendance-agent-windows.zip
       - uses: softprops/action-gh-release@v2
         with:

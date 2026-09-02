@@ -11,9 +11,9 @@ public static class Program
         try
         {
             Log.Information("Agent started | version={Version} | dotnet={DotNet} | platform={Platform} | cwd={Cwd}",typeof(Program).Assembly.GetName().Version,Environment.Version,Environment.OSVersion,Directory.GetCurrentDirectory());Log.Information("Log file: {LogPath}",logPath);
-            var config=AgentConfig.Load();using var cms=new CmsClient();var runner=new CommandRunner(config,new ZkClient(),cms);
+            var dbPath=Path.Combine(Logging.ResolvedDirectory,"attendance.db");using(var store=new Store(dbPath)){store.Init();var zk=new ZkClient();await FirstRun.EnsureConfiguredAsync(store,zk);using var cms=new CmsClient();var runner=new CommandRunner(dbPath,zk,cms);
             if(args.Length==0){await InteractiveAsync(runner);return 0;}
-            return await DispatchAsync(runner,args);
+            return await DispatchAsync(runner,args);}
         }
         catch(ConfigException ex){Console.Error.WriteLine(ex.Message);return 1;}
         catch(ArgumentException ex){Console.Error.WriteLine($"Error: {ex.Message}\n\n{Usage}");return 2;}
@@ -26,7 +26,26 @@ public static class Program
     }
     private static Dictionary<string,string?> Parse(IEnumerable<string> values){var args=values.ToArray();var result=new Dictionary<string,string?>();for(var i=0;i<args.Length;i++){if(!args[i].StartsWith("--"))throw new ArgumentException($"Unexpected argument '{args[i]}'");var key=args[i][2..];if(key=="force"){result[key]=null;continue;}if(i+1>=args.Length||args[i+1].StartsWith("--"))throw new ArgumentException($"--{key} requires a value");result[key]=args[++i];}return result;}
     private static string? Get(Dictionary<string,string?> options,string key)=>options.GetValueOrDefault(key);private static string Required(Dictionary<string,string?> options,string key)=>Get(options,key)??throw new ArgumentException($"--{key} is required");
-    private static async Task InteractiveAsync(CommandRunner runner){while(true){Console.WriteLine("\n=== Worker Attendance Machines ===\n1. Fetch      - Tarik log dari mesin\n2. Export     - Export data ke CSV\n3. Delete     - Hapus log di mesin\n4. Status     - Status mesin\n5. Sync Users - Sync karyawan ke mesin\n6. Scan       - Cari mesin ZKTeco di jaringan\n7. Update Time - Sinkronkan waktu mesin dengan komputer\n0. Keluar");Console.Write("Pilih menu: ");switch(Console.ReadLine()?.Trim()){case"1":await runner.FetchAsync(Ask("Nama mesin (kosongkan = semua): "));break;case"2":runner.Export(Ask("Nama mesin (kosongkan = semua): "),Ask("Tanggal awal (YYYY-MM-DD, kosongkan = semua): "),Ask("Tanggal akhir (YYYY-MM-DD, kosongkan = semua): "),Ask("File output CSV: ")??"");break;case"3":runner.Delete(Ask("Nama mesin: ")??"",string.Equals(Ask("Force hapus walau ada unsynced? (y/N): "),"y",StringComparison.OrdinalIgnoreCase));break;case"4":runner.Status(Ask("Nama mesin (kosongkan = semua): "));break;case"5":await runner.SyncUsersAsync(Ask("Nama mesin: ")??"");break;case"6":await runner.ScanAsync(Ask("Subnet (kosongkan = auto-detect, format 192.168.1): "),4370);break;case"7":runner.UpdateTime(Ask("Nama mesin (kosongkan = semua): "));break;case"0":return;default:Console.WriteLine("Pilihan tidak valid.");break;}}}
+    private static async Task InteractiveAsync(CommandRunner runner){while(true){Console.WriteLine("\n=== Worker Attendance Machines ===\n1. Fetch      - Tarik log dari mesin\n2. Export     - Export data ke CSV\n3. Delete     - Hapus log di mesin\n4. Status     - Status mesin\n5. Sync Users - Sync karyawan ke mesin\n6. Scan       - Cari mesin ZKTeco di jaringan\n7. Update Time - Sinkronkan waktu mesin dengan komputer\n8. Settings   - Kelola CMS URL, capacity warning, & mesin\n0. Keluar");Console.Write("Pilih menu: ");switch(Console.ReadLine()?.Trim()){case"1":await runner.FetchAsync(Ask("Nama mesin (kosongkan = semua): "));break;case"2":runner.Export(Ask("Nama mesin (kosongkan = semua): "),Ask("Tanggal awal (YYYY-MM-DD, kosongkan = semua): "),Ask("Tanggal akhir (YYYY-MM-DD, kosongkan = semua): "),Ask("File output CSV: ")??"");break;case"3":runner.Delete(Ask("Nama mesin: ")??"",string.Equals(Ask("Force hapus walau ada unsynced? (y/N): "),"y",StringComparison.OrdinalIgnoreCase));break;case"4":runner.Status(Ask("Nama mesin (kosongkan = semua): "));break;case"5":await runner.SyncUsersAsync(Ask("Nama mesin: ")??"");break;case"6":await runner.ScanAsync(Ask("Subnet (kosongkan = auto-detect, format 192.168.1): "),4370);break;case"7":runner.UpdateTime(Ask("Nama mesin (kosongkan = semua): "));break;case"8":await SettingsMenuAsync(runner);break;case"0":return;default:Console.WriteLine("Pilihan tidak valid.");break;}}}
+    private static async Task SettingsMenuAsync(CommandRunner runner)
+    {
+        while(true)
+        {
+            Console.WriteLine("\n=== Settings ===\n1. Lihat settings & mesin\n2. Ubah CMS URL\n3. Ubah capacity warning %\n4. Tambah mesin manual\n5. Edit atau hapus mesin\n6. Scan & daftarkan mesin\n0. Kembali");Console.Write("Pilih menu: ");
+            switch(Console.ReadLine()?.Trim())
+            {
+                case"1":var settings=runner.GetSettings();Console.WriteLine($"CMS URL: {settings.CmsBaseUrl}\nCapacity warning: {settings.CapacityWarningPct}%");foreach(var m in runner.ListMachines())Console.WriteLine($"- {m.Name}: {m.Ip}:{m.Port}, serial {m.SerialNumber}");break;
+                case"2":var url=Ask("URL CMS baru: ");if(url is not null&&Confirm($"Simpan URL '{url}'? (Y/n): "))runner.SetCmsBaseUrl(url);break;
+                case"3":if(int.TryParse(Ask("Capacity warning %: "),out var pct)&&pct is >=0 and <=100)runner.SetCapacityWarningPct(pct);else Console.WriteLine("Nilai harus 0-100.");break;
+                case"4":var added=ReadMachine();if(added is not null)runner.AddOrUpdateMachine(added);break;
+                case"5":var name=Ask("Nama mesin: ");if(name is null)break;var existing=runner.ListMachines().FirstOrDefault(x=>x.Name==name);if(existing is null){Console.WriteLine("Mesin tidak ditemukan.");break;}var action=Ask("Ketik 'hapus' untuk hapus, atau Enter untuk edit: ");if(action?.Equals("hapus",StringComparison.OrdinalIgnoreCase)==true){Console.WriteLine(runner.RemoveMachine(name)?"Mesin dihapus.":"Mesin tidak ditemukan.");break;}var edited=ReadMachine(existing);if(edited is not null)runner.AddOrUpdateMachine(edited);break;
+                case"6":await runner.RegisterViaScanAsync(Ask("Subnet (kosongkan = auto-detect): "),4370);break;
+                case"0":return;default:Console.WriteLine("Pilihan tidak valid.");break;
+            }
+        }
+    }
+    private static MachineConfig? ReadMachine(MachineConfig? existing=null){var name=existing?.Name??Ask("Nama: ");var ip=Ask($"IP{(existing is null?"":$" [{existing.Ip}]")}: ")??existing?.Ip;var portText=Ask($"Port{(existing is null?"":$" [{existing.Port}]")}: ");var serial=Ask($"Serial number{(existing is null?"":$" [{existing.SerialNumber}]")}: ")??existing?.SerialNumber;var port=portText is null?existing?.Port??4370:int.TryParse(portText,out var parsed)?parsed:0;if(string.IsNullOrWhiteSpace(name)||string.IsNullOrWhiteSpace(ip)||string.IsNullOrWhiteSpace(serial)||port<=0){Console.WriteLine("Data mesin tidak valid.");return null;}return new(name,ip,port,serial);}
+    private static bool Confirm(string prompt){Console.Write(prompt);var value=Console.ReadLine()?.Trim();return string.IsNullOrEmpty(value)||value.Equals("y",StringComparison.OrdinalIgnoreCase);}
     private static string? Ask(string prompt){Console.Write(prompt);var value=Console.ReadLine()?.Trim();return string.IsNullOrEmpty(value)?null:value;}
     private const string Usage="Commands: fetch [--machine NAME] | export [--machine NAME] [--from DATE] [--to DATE] --out FILE | delete --machine NAME [--force] | status [--machine NAME] | sync-users --machine NAME | scan [--subnet PREFIX] [--port PORT] | update-time [--machine NAME]";
 }

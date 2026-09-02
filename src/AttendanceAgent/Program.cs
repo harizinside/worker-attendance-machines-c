@@ -12,7 +12,7 @@ public static class Program
         {
             Log.Information("Agent started | version={Version} | dotnet={DotNet} | platform={Platform} | cwd={Cwd}",typeof(Program).Assembly.GetName().Version,Environment.Version,Environment.OSVersion,Directory.GetCurrentDirectory());Log.Information("Log file: {LogPath}",logPath);
             var dbPath=Path.Combine(Logging.ResolvedDirectory,"attendance.db");using(var store=new Store(dbPath)){store.Init();var zk=new ZkClient();await FirstRun.EnsureConfiguredAsync(store,zk);using var cms=new CmsClient();var runner=new CommandRunner(dbPath,zk,cms);
-            if(args.Length==0){await InteractiveAsync(runner);return 0;}
+            if(args.Length==0){using var updater=new AutoUpdater();await updater.CheckAndPromptAsync(runner);await InteractiveAsync(runner);return 0;}
             return await DispatchAsync(runner,args);}
         }
         catch(ConfigException ex){Console.Error.WriteLine(ex.Message);return 1;}
@@ -31,21 +31,22 @@ public static class Program
     {
         while(true)
         {
-            Console.WriteLine("\n=== Settings ===\n1. Lihat settings & mesin\n2. Ubah CMS URL\n3. Ubah capacity warning %\n4. Tambah mesin manual\n5. Edit atau hapus mesin\n6. Scan & daftarkan mesin\n0. Kembali");Console.Write("Pilih menu: ");
+            Console.WriteLine("\n=== Settings ===\n1. Lihat settings & mesin\n2. Ubah CMS URL\n3. Ubah capacity warning %\n4. Tambah mesin manual\n5. Edit atau hapus mesin\n6. Scan & daftarkan mesin\n7. Toggle auto-update\n0. Kembali");Console.Write("Pilih menu: ");
             switch(Console.ReadLine()?.Trim())
             {
-                case"1":var settings=runner.GetSettings();Console.WriteLine($"CMS URL: {settings.CmsBaseUrl}\nCapacity warning: {settings.CapacityWarningPct}%");foreach(var m in runner.ListMachines())Console.WriteLine($"- {m.Name}: {m.Ip}:{m.Port}, serial {m.SerialNumber}");break;
+                case"1":var settings=runner.GetSettings();Console.WriteLine($"CMS URL: {settings.CmsBaseUrl}\nCapacity warning: {settings.CapacityWarningPct}%\nAuto-update: {(runner.GetAutoUpdateEnabled()?"ON":"OFF")}");foreach(var m in runner.ListMachines())Console.WriteLine($"- {m.Name}: {m.Ip}:{m.Port}, serial {m.SerialNumber}");break;
                 case"2":var url=Ask("URL CMS baru: ");if(url is not null&&Confirm($"Simpan URL '{url}'? (Y/n): "))runner.SetCmsBaseUrl(url);break;
                 case"3":if(int.TryParse(Ask("Capacity warning %: "),out var pct)&&pct is >=0 and <=100)runner.SetCapacityWarningPct(pct);else Console.WriteLine("Nilai harus 0-100.");break;
                 case"4":var added=ReadMachine();if(added is not null)runner.AddOrUpdateMachine(added);break;
                 case"5":var name=Ask("Nama mesin: ");if(name is null)break;var existing=runner.ListMachines().FirstOrDefault(x=>x.Name==name);if(existing is null){Console.WriteLine("Mesin tidak ditemukan.");break;}var action=Ask("Ketik 'hapus' untuk hapus, atau Enter untuk edit: ");if(action?.Equals("hapus",StringComparison.OrdinalIgnoreCase)==true){Console.WriteLine(runner.RemoveMachine(name)?"Mesin dihapus.":"Mesin tidak ditemukan.");break;}var edited=ReadMachine(existing);if(edited is not null)runner.AddOrUpdateMachine(edited);break;
                 case"6":await runner.RegisterViaScanAsync(Ask("Subnet (kosongkan = auto-detect): "),4370);break;
+                case"7":var enabled=!runner.GetAutoUpdateEnabled();runner.SetAutoUpdateEnabled(enabled);Console.WriteLine($"Auto-update di{(enabled?"aktifkan":"matikan")}.");break;
                 case"0":return;default:Console.WriteLine("Pilihan tidak valid.");break;
             }
         }
     }
     private static MachineConfig? ReadMachine(MachineConfig? existing=null){var name=existing?.Name??Ask("Nama: ");var ip=Ask($"IP{(existing is null?"":$" [{existing.Ip}]")}: ")??existing?.Ip;var portText=Ask($"Port{(existing is null?"":$" [{existing.Port}]")}: ");var serial=Ask($"Serial number{(existing is null?"":$" [{existing.SerialNumber}]")}: ")??existing?.SerialNumber;var port=portText is null?existing?.Port??4370:int.TryParse(portText,out var parsed)?parsed:0;if(string.IsNullOrWhiteSpace(name)||string.IsNullOrWhiteSpace(ip)||string.IsNullOrWhiteSpace(serial)||port<=0){Console.WriteLine("Data mesin tidak valid.");return null;}return new(name,ip,port,serial);}
-    private static bool Confirm(string prompt){Console.Write(prompt);var value=Console.ReadLine()?.Trim();return string.IsNullOrEmpty(value)||value.Equals("y",StringComparison.OrdinalIgnoreCase);}
-    private static string? Ask(string prompt){Console.Write(prompt);var value=Console.ReadLine()?.Trim();return string.IsNullOrEmpty(value)?null:value;}
+    internal static bool Confirm(string prompt){Console.Write(prompt);var value=Console.ReadLine()?.Trim();return string.IsNullOrEmpty(value)||value.Equals("y",StringComparison.OrdinalIgnoreCase);}
+    internal static string? Ask(string prompt){Console.Write(prompt);var value=Console.ReadLine()?.Trim();return string.IsNullOrEmpty(value)?null:value;}
     private const string Usage="Commands: fetch [--machine NAME] | export [--machine NAME] [--from DATE] [--to DATE] --out FILE | delete --machine NAME [--force] | status [--machine NAME] | sync-users --machine NAME | scan [--subnet PREFIX] [--port PORT] | update-time [--machine NAME]";
 }

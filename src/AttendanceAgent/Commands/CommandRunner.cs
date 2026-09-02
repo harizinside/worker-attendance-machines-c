@@ -53,6 +53,8 @@ public sealed class CommandRunner(string dbPath, IZkClient zk, ICmsClient cms)
     public AppSettings GetSettings(){using var store=OpenStore();return store.GetAppSettings();}
     public void SetCmsBaseUrl(string url){using var store=OpenStore();store.SetCmsBaseUrl(url);}
     public void SetCapacityWarningPct(int pct){using var store=OpenStore();store.SetCapacityWarningPct(pct);}
+    public bool GetAutoUpdateEnabled(){using var store=OpenStore();return store.GetAutoUpdateEnabled();}
+    public void SetAutoUpdateEnabled(bool enabled){using var store=OpenStore();store.SetAutoUpdateEnabled(enabled);}
     public IReadOnlyList<MachineConfig> ListMachines(){using var store=OpenStore();return store.GetMachines();}
     public void AddOrUpdateMachine(MachineConfig machine){using var store=OpenStore();store.UpsertMachine(machine);}
     public bool RemoveMachine(string name){using var store=OpenStore();return store.RemoveMachine(name);}

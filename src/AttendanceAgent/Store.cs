@@ -50,6 +50,8 @@ public sealed class Store : IDisposable
     public AppSettings GetAppSettings(){var url=GetSetting("cms_base_url")??"";var raw=GetSetting("capacity_warning_pct");return new(url,int.TryParse(raw,out var pct)?pct:90);}
     public void SetCmsBaseUrl(string url)=>SetSetting("cms_base_url",url);
     public void SetCapacityWarningPct(int pct)=>SetSetting("capacity_warning_pct",pct.ToString());
+    public bool GetAutoUpdateEnabled()=>GetSetting("auto_update_enabled") is not "false";
+    public void SetAutoUpdateEnabled(bool enabled)=>SetSetting("auto_update_enabled",enabled?"true":"false");
     public IReadOnlyList<MachineConfig> GetMachines(){using var cmd=Command("SELECT name,ip,port,serial_number FROM machines ORDER BY name");using var r=cmd.ExecuteReader();var rows=new List<MachineConfig>();while(r.Read())rows.Add(new(r.GetString(0),r.GetString(1),r.GetInt32(2),r.GetString(3)));return rows;}
     public MachineConfig? FindMachine(string name){using var cmd=Command("SELECT name,ip,port,serial_number FROM machines WHERE name=$n");Add(cmd,"$n",name);using var r=cmd.ExecuteReader();return r.Read()?new(r.GetString(0),r.GetString(1),r.GetInt32(2),r.GetString(3)):null;}
     public void UpsertMachine(MachineConfig machine){using var cmd=Command("INSERT INTO machines(name,ip,port,serial_number) VALUES($n,$i,$p,$s) ON CONFLICT(name) DO UPDATE SET ip=excluded.ip,port=excluded.port,serial_number=excluded.serial_number");Add(cmd,"$n",machine.Name);Add(cmd,"$i",machine.Ip);Add(cmd,"$p",machine.Port);Add(cmd,"$s",machine.SerialNumber);cmd.ExecuteNonQuery();}
